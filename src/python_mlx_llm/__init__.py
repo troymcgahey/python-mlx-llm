@@ -4,19 +4,13 @@ def main() -> None:
 
     text = "hello mlx"
 
-    #creates a set of characters in order from text.
-    #creating a set will also eliminate duplicates
     characters = sorted(set(text))
 
-    #creates a dictionary mapping characters to index value
-    #char_to_id = {character: index for index, character in enumerate(characters)}
     char_to_id = {}
     for index, character in enumerate(characters):
         print("Assigning", repr(character), "to token", index)
         char_to_id[character] = index
 
-    #creates a second dictionary mapping tokens to characters
-    #id_to_char = {index: character for character, index in char_to_id.items()}
     id_to_char = {}
     for character, index in char_to_id.items():
         id_to_char[index] = character
@@ -32,6 +26,48 @@ def main() -> None:
     print("Token ID list:", token_ids)
     tokens = mx.array(token_ids)
     #decoded = "".join(id_to_char[token.item()] for token in tokens)
+
+    inputs = tokens[:-1]
+    targets = tokens[1:]
+
+    counts = mx.zeros(
+        shape=(len(characters), len(characters)),
+        dtype=mx.int32
+    )
+
+    for position in range(len(inputs)):
+        input_id = inputs[position].item()
+        target_id = targets[position].item()
+
+        counts = counts.at[input_id, target_id]. add(1)
+
+        input_character = id_to_char[input_id]
+        target_character = id_to_char[target_id]
+
+        print(
+            "Training pair:",
+            repr(input_character),
+            "->",
+            repr(target_character),
+        )
+
+    print("Transition counts:")
+    
+    column_labels = []
+
+    for character in characters:
+        column_labels.append(repr(character))
+
+    print("Next-token columns:", column_labels)
+
+    for input_id in range(len(characters)):
+        input_character = id_to_char[input_id]
+        row = counts[input_id].tolist()
+        print("After", repr(input_character), ":", row)
+
+    print("Inputs:", inputs)
+    print("Targets:", targets)
+
     decoded_characters = []
     for token in tokens:
         token_id = token.item()
