@@ -8,22 +8,18 @@ def main() -> None:
 
     char_to_id = {}
     for index, character in enumerate(characters):
-        print("Assigning", repr(character), "to token", index)
         char_to_id[character] = index
 
     id_to_char = {}
     for character, index in char_to_id.items():
         id_to_char[index] = character
 
-    print("Character to ID:", char_to_id)
-    print("ID to character:", id_to_char)
 
     #tokens = mx.array([char_to_id[character] for character in text])
     token_ids = []
     for character in text:
         token_id = char_to_id[character]
         token_ids.append(token_id)
-    print("Token ID list:", token_ids)
     tokens = mx.array(token_ids)
     #decoded = "".join(id_to_char[token.item()] for token in tokens)
 
@@ -50,6 +46,47 @@ def main() -> None:
             "->",
             repr(target_character),
         )
+
+    smoothed_counts = counts + 1
+
+    row_totals = mx.sum(
+        smoothed_counts,
+        axis=1,
+        keepdims=True,
+    )
+
+    probabilities = smoothed_counts / row_totals
+
+    mx.random.seed(42)
+
+    current_id = char_to_id["h"]
+    generated_characters = [id_to_char[current_id]]
+
+    for step in range(30):
+        next_token_probabilities = probabilities[current_id]
+        logits = mx.log(next_token_probabilities)
+
+        next_id = mx.random.categorical(logits).item()
+        next_character = id_to_char[next_id]
+
+        generated_characters.append(next_character)
+        current_id = next_id
+
+    generated_text = "".join(generated_characters)
+
+    print("Generated text:", repr(generated_text))
+
+    letter_l_id = char_to_id["l"]
+
+    print(
+        "Probabilities after 'l':",
+        probabilities[letter_l_id].tolist(),
+    )
+
+    print(
+        "Probability row totals:",
+        mx.sum(probabilities, axis=1).tolist(),
+    )
 
     print("Transition counts:")
     
