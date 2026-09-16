@@ -1,4 +1,19 @@
 import mlx.core as mx
+import mlx.nn as nn
+import mlx.optimizers as optim
+
+def loss_fn(
+    model: nn.Module,
+    inputs: mx.array,
+    targets: mx.array,
+) -> mx.array:
+    logits = model(inputs)
+
+    return nn.losses.cross_entropy(
+        logits,
+        targets,
+        reduction="mean",
+    )
 
 def main() -> None:
 
@@ -15,13 +30,11 @@ def main() -> None:
         id_to_char[index] = character
 
 
-    #tokens = mx.array([char_to_id[character] for character in text])
     token_ids = []
     for character in text:
         token_id = char_to_id[character]
         token_ids.append(token_id)
     tokens = mx.array(token_ids)
-    #decoded = "".join(id_to_char[token.item()] for token in tokens)
 
     inputs = tokens[:-1]
     targets = tokens[1:]
@@ -118,3 +131,53 @@ def main() -> None:
     print("Encoded:", tokens)
     print("Decoded:", decoded)
     print("Decoded characer list:", decoded_characters)
+
+    ################### NEW 09/02/2026  #####################3
+
+    vocabulary_size = len(characters)
+
+    model = nn.Embedding(
+        num_embeddings=vocabulary_size,
+        dims=vocabulary_size,
+    )
+
+    logits = model(inputs)
+    mx.eval(logits)
+
+    print("Input shape:", inputs.shape)
+    print("Logits shape:", logits.shape)
+    print("Scores for the first input:", logits[0].tolist())
+
+    first_logits = logits[0]
+    first_probabilities = mx.softmax(first_logits)
+
+    loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
+
+    optimizer = optim.SGD(learning_rate=0.5)
+
+    for step in range(101):
+        loss, gradients = loss_and_grad_fn(
+            model,
+            inputs,
+            targets,
+        )
+
+        optimizer.update(model, gradients)
+        mx.eval(model.parameters(), optimizer.state, loss)
+
+        if step % 10 == 0:
+            print("Step:", step, "Loss:", loss.item())
+
+    letter_l_id = char_to_id["l"]
+    letter_l_input = mx.array([letter_l_id])
+
+    trained_logits = model(letter_l_input)
+    trained_probabilities = mx.softmax(trained_logits[0])
+
+    print("Next-token columns:", column_labels)
+    print(
+        "Learned probabilities after 'l':",
+        trained_probabilities.tolist(),
+    )
+
+
