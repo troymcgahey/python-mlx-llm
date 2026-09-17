@@ -1,5 +1,6 @@
 import mlx.core as mx
 import mlx.nn as nn
+import mlx.optimizers as optim
 
 class ContextLanguageModel(nn.Module):
     def __init__(
@@ -36,6 +37,19 @@ class ContextLanguageModel(nn.Module):
         logits = self.output(flattened_embeddings)
 
         return logits
+
+def loss_fn(
+    model: ContextLanguageModel,
+    inputs: mx.array,
+    targets: mx.array,
+) -> mx.array:
+    logits = model(inputs)
+
+    return nn.losses.cross_entropy(
+        logits,
+        targets,
+        reduction="mean",
+    )
 
 def main() -> None:
     text = "hello mlx"
@@ -96,6 +110,22 @@ def main() -> None:
 
     logits = model(inputs)
     mx.eval(logits)
+
+    loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
+    optimizer = optim.SGD(learning_rate=0.5)
+
+    for step in range(201):
+        loss, gradients = loss_and_grad_fn(
+            model,
+            inputs,
+            targets,
+        )
+
+        optimizer.update(model, gradients)
+        mx.eval(model.parameters(), optimizer.state, loss)
+
+        if step % 20 == 0:
+            print("Step:", step, "Loss:", loss.item())
 
     print("Model input shape:", inputs.shape)
     print("Model output shape:", logits.shape)
