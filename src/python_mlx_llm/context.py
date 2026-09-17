@@ -127,6 +127,32 @@ def main() -> None:
         if step % 20 == 0:
             print("Step:", step, "Loss:", loss.item())
 
+
+    prompt = "hel"
+
+    generated_ids = []
+
+    for character in prompt:
+        generated_ids.append(char_to_id[character])
+
+    for step in range(12):
+        context_ids = generated_ids[-context_size:]
+        context_input = mx.array([context_ids])
+
+        next_logits = model(context_input)[0]
+        next_id = mx.argmax(next_logits).item()
+
+        generated_ids.append(next_id)
+
+    generated_characters = []
+
+    for token in generated_ids:
+        generated_characters.append(id_to_char[token])
+
+    generated_text = "".join(generated_characters)
+
+    print("Context model generated:", repr(generated_text))
+
     print("Model input shape:", inputs.shape)
     print("Model output shape:", logits.shape)
 
