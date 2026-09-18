@@ -24,6 +24,21 @@ class ContextLanguageModel(nn.Module):
             dims=embedding_size,
         )
 
+        self.query_projection = nn.Linear(
+            input_dims=embedding_size,
+            output_dims=embedding_size,
+        )
+
+        self.key_projection = nn.Linear(
+            input_dims=embedding_size,
+            output_dims=embedding_size,
+        )
+
+        self.value_projection = nn.Linear(
+            input_dims=embedding_size,
+            output_dims=embedding_size,
+        )
+
         self.output = nn.Linear(
             input_dims=context_size * embedding_size,
             output_dims=vocabulary_size,
@@ -37,9 +52,23 @@ class ContextLanguageModel(nn.Module):
 
         embeddings = token_embeddings + position_embeddings
 
+        queries = self.query_projection(embeddings)
+        keys = self.query_projection(embeddings)
+        values = self.value_projection(embeddings)
+
+        attention_scores = queries @ keys.transpose(0, 2, 1)
+        attention_scores = attention_scores / (self.embedding_size ** 0.5)
+
+        attention_weights = mx.softmax(
+            attention_scores,
+            axis=-1,
+        )
+
+        attended_embeddings = attention_weights @ values
+
         batch_size = inputs.shape[0]
 
-        flattened_embeddings = embeddings.reshape(
+        flattened_embeddings = attended_embeddings.reshape(
             batch_size,
             self.context_size * self.embedding_size,
         )
