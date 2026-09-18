@@ -53,9 +53,11 @@ def loss_fn(
 
 def main() -> None:
     text = "hello mlx"
+    end_token = "<EOS>"
     context_size = 3
 
     characters = sorted(set(text))
+    characters.append(end_token)
 
     char_to_id = {}
 
@@ -72,10 +74,14 @@ def main() -> None:
     for character in text:
         token_ids.append(char_to_id[character])
 
+    token_ids.append(char_to_id[end_token])
+
     tokens = mx.array(token_ids)
 
     input_examples = []
     target_examples = []
+
+    end_token_id = char_to_id[end_token]
 
     for start in range(len(tokens) - context_size):
         context = tokens[start : start + context_size]
@@ -141,6 +147,27 @@ def main() -> None:
 
         next_logits = model(context_input)[0]
         next_id = mx.argmax(next_logits).item()
+
+        context_characters = []
+
+        for token_id in context_ids:
+            context_characters.append(id_to_char[token_id])
+
+        context_text = "".join(context_characters)
+        next_character = id_to_char[next_id]
+
+        print(
+            "Generation step:",
+            step,
+            "Context",
+            repr(context_text),
+            "Prediction",
+            repr(next_character),
+        )
+
+        if next_id == end_token_id:
+            print("Reached the end-of-sequence token.")
+            break
 
         generated_ids.append(next_id)
 
