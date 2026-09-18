@@ -14,8 +14,13 @@ class ContextLanguageModel(nn.Module):
         self.context_size = context_size
         self.embedding_size = embedding_size
 
-        self.embedding = nn.Embedding(
+        self.token_embedding = nn.Embedding(
             num_embeddings=vocabulary_size,
+            dims=embedding_size,
+        )
+
+        self.position_embedding = nn.Embedding(
+            num_embeddings=context_size,
             dims=embedding_size,
         )
 
@@ -25,7 +30,12 @@ class ContextLanguageModel(nn.Module):
         )
 
     def __call__(self, inputs: mx.array) -> mx.array:
-        embeddings = self.embedding(inputs)
+        token_embeddings = self.token_embedding(inputs)
+
+        positions = mx.arange(self.context_size)
+        position_embeddings = self.position_embedding(positions)
+
+        embeddings = token_embeddings + position_embeddings
 
         batch_size = inputs.shape[0]
 
