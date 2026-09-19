@@ -44,7 +44,10 @@ class ContextLanguageModel(nn.Module):
             output_dims=vocabulary_size,
         )
 
-    def __call__(self, inputs: mx.array) -> mx.array:
+    def __call__(self, inputs: mx.array, 
+                 return_attention: 
+                 bool = False
+    ) -> mx.array:
         token_embeddings = self.token_embedding(inputs)
 
         positions = mx.arange(self.context_size)
@@ -75,6 +78,9 @@ class ContextLanguageModel(nn.Module):
 
         logits = self.output(flattened_embeddings)
 
+        if return_attention:
+            return logits, attention_weights
+
         return logits
 
 def loss_fn(
@@ -91,31 +97,33 @@ def loss_fn(
     )
 
 def main() -> None:
-    text = "hello mlx"
+    training_text = "hello mlx"
     end_token = "<EOS>"
     context_size = 3
 
-    characters = sorted(set(text))
+    characters = sorted(set(training_text))
     characters.append(end_token)
 
+    #maps characters to IDs
     char_to_id = {}
 
     for index, character in enumerate(characters):
         char_to_id[character] = index
 
+    #maps IDs to characters
     id_to_char = {}
 
     for character, index in char_to_id.items():
         id_to_char[index] = character
 
-    token_ids = []
+    tokenized_text = []
 
-    for character in text:
-        token_ids.append(char_to_id[character])
+    for character in training_text:
+        tokenized_text.append(char_to_id[character])
 
-    token_ids.append(char_to_id[end_token])
+    tokenized_text.append(char_to_id[end_token])
 
-    tokens = mx.array(token_ids)
+    tokens = mx.array(tokenized_text)
 
     input_examples = []
     target_examples = []
@@ -159,6 +167,7 @@ def main() -> None:
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     optimizer = optim.SGD(learning_rate=0.5)
 
+    #training loop
     for step in range(201):
         loss, gradients = loss_and_grad_fn(
             model,
@@ -171,6 +180,33 @@ def main() -> None:
 
         if step % 20 == 0:
             print("Step:", step, "Loss:", loss.item())
+
+    inspection_text = "hel"
+    inspection_ids = []
+
+    for character in inspection_text:
+        inspection_ids.append(char_to_id[character])
+
+    inspection_input = mx.array([inspection_ids])
+
+    inspection_logits, inspection_attention = model(
+        inspection_input,
+        return_attention=True,
+    )
+
+    attention_matrix = inspection_attention[0].tolist()
+
+    print("Attention columns:", list(inspection_text))
+
+    for position, row in enumerate(attention_matrix):
+        query_character = inspection_text[position]
+
+        print(
+            "Attention from",
+            repr(query_character),
+            ":",
+            row,
+        )
 
 
     prompt = "hel"
@@ -189,8 +225,8 @@ def main() -> None:
 
         context_characters = []
 
-        for token_id in context_ids:
-            context_characters.append(id_to_char[token_id])
+        for tokenized_text in context_ids:
+            context_characters.append(id_to_char[tokenized_text])
 
         context_text = "".join(context_characters)
         next_character = id_to_char[next_id]
