@@ -62,6 +62,16 @@ class ContextLanguageModel(nn.Module):
         attention_scores = queries @ keys.transpose(0, 2, 1)
         attention_scores = attention_scores / (self.embedding_size ** 0.5)
 
+        causal_mask = mx.triu(
+            mx.full(
+                shape=(self.context_size, self.context_size),
+                vals=float("-inf"),
+            ),
+            k=1,
+        )
+
+        attention_scores = attention_scores + causal_mask
+
         attention_weights = mx.softmax(
             attention_scores,
             axis=-1,
