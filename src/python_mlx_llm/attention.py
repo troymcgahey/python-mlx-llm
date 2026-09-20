@@ -44,6 +44,28 @@ class ContextLanguageModel(nn.Module):
             output_dims=vocabulary_size,
         )
 
+        self.attention_norm = nn.LayerNorm(
+            dims=embedding_size,
+        )
+
+        feed_forward_size = embedding_size * 4
+
+        self.feed_forward_norm = nn.LayerNorm(
+            dims=embedding_size,
+        )
+
+        self.feed_forward = nn.Sequential(
+            nn.Linear(
+                input_dims=embedding_size,
+                output_dims=feed_forward_size,
+            ),
+            nn.GELU(),
+            nn.Linear(
+                input_dims=feed_forward_size,
+                output_dims=embedding_size,
+            ),
+        )
+
     def __call__(self, inputs: mx.array, 
                  return_attention: 
                  bool = False
@@ -55,9 +77,11 @@ class ContextLanguageModel(nn.Module):
 
         embeddings = token_embeddings + position_embeddings
 
-        queries = self.query_projection(embeddings)
-        keys = self.query_projection(embeddings)
-        values = self.value_projection(embeddings)
+        normalized_embeddings = self.attention_norm(embeddings)
+
+        queries = self.query_projection(normalized_embeddings)
+        keys = self.query_projection(normalized_embeddings)
+        values = self.value_projection(normalized_embeddings)
 
         attention_scores = queries @ keys.transpose(0, 2, 1)
         attention_scores = attention_scores / (self.embedding_size ** 0.5)
@@ -77,11 +101,24 @@ class ContextLanguageModel(nn.Module):
             axis=-1,
         )
 
-        attended_embeddings = attention_weights @ values
+        attention_output = attention_weights @ values
+        attended_embeddings = embeddings + attention_output
+
+        normalized_attention = self.feed_forward_norm(
+            attended_embeddings
+        )
+
+        feed_forward_output = self.feed_forward(
+            normalized_attention
+        )
+
+        transformer_output = (
+            attended_embeddings + feed_forward_output
+        )
 
         batch_size = inputs.shape[0]
 
-        flattened_embeddings = attended_embeddings.reshape(
+        flattened_embeddings = transformer_output.reshape(
             batch_size,
             self.context_size * self.embedding_size,
         )
