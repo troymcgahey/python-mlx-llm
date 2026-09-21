@@ -217,7 +217,7 @@ def main() -> None:
     optimizer = optim.SGD(learning_rate=0.5)
 
     #training loop
-    for step in range(201):
+    for step in range(1001):
         loss, gradients = loss_and_grad_fn(
             model,
             inputs,
@@ -229,6 +229,29 @@ def main() -> None:
 
         if step % 20 == 0:
             print("Step:", step, "Loss:", loss.item())
+
+    letter_l_id = char_to_id["l"]
+    letter_o_id = char_to_id["o"]
+
+    probe_input = mx.array(
+        [[letter_l_id, letter_l_id, letter_o_id]]
+    )
+
+    probe_logits = model(probe_input)
+    first_position_logits = probe_logits[0, 0]
+    first_position_probabilities = mx.softmax(
+        first_position_logits
+    )
+
+    print(
+        "P(next='l' | current='l'):",
+        first_position_probabilities[letter_l_id].item(),
+    )
+
+    print(
+        "P(next='o' | current='l'):",
+        first_position_probabilities[letter_o_id].item(),
+    )
 
     inspection_text = "hel"
     inspection_ids = []
