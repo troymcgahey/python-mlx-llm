@@ -1,6 +1,7 @@
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+from python_mlx_llm.tokenizer import CharacterTokenizer
 
 # A tiny decoder-only language model. Each position predicts the next token
 # using only tokens at or before that position.
@@ -174,31 +175,20 @@ def main() -> None:
     end_token = "<EOS>"
     context_size = 3
 
-    # The vocabulary assigns one ID to each character plus <EOS>.
-    characters = sorted(set(training_text))
-    characters.append(end_token)
+    tokenizer = CharacterTokenizer(
+        training_text=training_text,
+        end_token=end_token,
+    )
 
-    # Encode characters as integer token IDs.
-    char_to_id = {}
-
-    for index, character in enumerate(characters):
-        char_to_id[character] = index
-
-    # Decode token IDs back into readable characters.
-    id_to_char = {}
-
-    for character, index in char_to_id.items():
-        id_to_char[index] = character
-
-    # Convert the corpus to IDs and append the end marker as its final token.
-    tokenized_text = []
-
-    for character in training_text:
-        tokenized_text.append(char_to_id[character])
-
-    tokenized_text.append(char_to_id[end_token])
+    tokenized_text = tokenizer.encode(
+        training_text,
+        add_end_token=True,
+    )
 
     tokens = mx.array(tokenized_text)
+
+    char_to_id = tokenizer.token_to_id
+    id_to_char = tokenizer.id_to_token
 
     # Collect overlapping windows. A size-3 input such as "hel" is paired
     # with shifted targets "ell": each position predicts its next token.
@@ -243,7 +233,7 @@ def main() -> None:
 
     # Build a small model with eight learned features per token/position.
     model = ContextLanguageModel(
-        vocabulary_size=len(characters),
+        vocabulary_size=tokenizer.vocabulary_size,
         context_size=context_size,
         embedding_size=8,
     )
