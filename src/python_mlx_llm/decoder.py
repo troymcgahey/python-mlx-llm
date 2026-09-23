@@ -2,6 +2,7 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 from python_mlx_llm.tokenizer import CharacterTokenizer
+from python_mlx_llm.data import create_training_windows
 
 # A tiny decoder-only language model. Each position predicts the next token
 # using only tokens at or before that position.
@@ -190,35 +191,19 @@ def main() -> None:
     char_to_id = tokenizer.token_to_id
     id_to_char = tokenizer.id_to_token
 
-    # Collect overlapping windows. A size-3 input such as "hel" is paired
-    # with shifted targets "ell": each position predicts its next token.
-    input_examples = []
-    target_examples = []
+    inputs, targets = create_training_windows(
+        token_ids=tokenized_text,
+        context_size=context_size,
+    )
 
     end_token_id = char_to_id[end_token]
 
-    for start in range(len(tokens) - context_size):
-        context = tokens[start : start + context_size]
-        target = tokens[
-            start + 1 : start + context_size + 1
-        ]
+    for example_index in range(inputs.shape[0]):
+        context_ids = inputs[example_index].tolist()
+        target_ids = targets[example_index].tolist()
 
-        input_examples.append(context)
-        target_examples.append(target)
-        
-        # Decode this training pair only for the human-readable trace.
-        context_characters = []
-
-        for token in context:
-            context_characters.append(id_to_char[token.item()])
-
-        context_text = "".join(context_characters)
-        target_characters = []
-
-        for token in target:
-            target_characters.append(id_to_char[token.item()])
-
-        target_text = "".join(target_characters)
+        context_text = tokenizer.decode(context_ids)
+        target_text = tokenizer.decode(target_ids)
 
         print(
             "Context:",
@@ -226,10 +211,6 @@ def main() -> None:
             "Target:",
             repr(target_text),
         )
-
-    # Stack windows into a batch: inputs and targets are both (7, 3).
-    inputs = mx.stack(input_examples)
-    targets = mx.stack(target_examples)
 
     # Build a small model with eight learned features per token/position.
     model = ContextLanguageModel(
