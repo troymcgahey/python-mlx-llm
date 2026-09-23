@@ -96,7 +96,7 @@ class ContextLanguageModel(nn.Module):
 
         # Each position produces a query, key, and value vector.
         queries = self.query_projection(normalized_embeddings)
-        keys = self.query_projection(normalized_embeddings)
+        keys = self.key_projection(normalized_embeddings)
         values = self.value_projection(normalized_embeddings)
 
         # Dot products score every query position against every key position.
