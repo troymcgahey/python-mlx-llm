@@ -106,20 +106,55 @@ def main() -> None:
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     optimizer = optim.SGD(learning_rate=0.5)
 
-    # Reuse the same tiny batch so we can observe the model memorizing it.
-    for step in range(1001):
-        loss, gradients = loss_and_grad_fn(
-            model,
+
+    epoch_count = 501
+    update_step = 0
+
+    for epoch in range(epoch_count):
+        epoch_loss_total = 0.0
+        epoch_example_count = 0
+
+        for batch_inputs, batch_targets in iterator_batches(
             inputs,
             targets,
-        )
+            batch_size=4,
+        ):
+            loss, gradients = loss_and_grad_fn(
+                model,
+                batch_inputs,
+                batch_targets,
+            )
 
-        optimizer.update(model, gradients)
-        mx.eval(model.parameters(), optimizer.state, loss)
+            optimizer.update(model, gradients)
 
-        if step % 20 == 0:
-            print("Step:", step, "Loss:", loss.item())
+            mx.eval(
+                model.parameters(),
+                optimizer.state,
+                loss,
+            )
 
+            current_batch_size = batch_inputs.shape[0]
+
+            epoch_loss_total += (
+                loss.item() * current_batch_size
+            )
+            epoch_example_count += current_batch_size
+            update_step += 1
+
+        if epoch % 20 == 0:
+            average_epoch_loss = (
+                epoch_loss_total / epoch_example_count
+            )
+
+
+            print(
+                "Epoch:",
+                epoch,
+                "Update:",
+                update_step,
+                "loss:",
+                average_epoch_loss,
+            )
     # Probe the first position. The causal mask lets it see only "l", not the
     # later tokens, so both observed first-position continuations remain valid.
     letter_l_id = char_to_id["l"]
