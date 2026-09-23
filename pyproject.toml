@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "mlx>=0.32.2",
+    "path>=17.1.1",
 ]
 
 [project.scripts]
