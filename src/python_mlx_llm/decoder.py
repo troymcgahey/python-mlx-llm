@@ -2,7 +2,10 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 from python_mlx_llm.tokenizer import CharacterTokenizer
-from python_mlx_llm.data import create_training_windows
+from python_mlx_llm.data import (
+    create_training_windows,
+    iterator_batches,
+)
 from python_mlx_llm.model import ContextLanguageModel
 from path import Path
 
@@ -58,6 +61,19 @@ def main() -> None:
         token_ids=tokenized_text,
         context_size=context_size,
     )
+
+    mx.random.seed(42)
+
+    for batch_inputs, batch_targets in iterator_batches(
+        inputs,
+        targets,
+        batch_size=4,
+    ):
+        print(
+            "Mini-batch shapes:",
+            batch_inputs.shape,
+            batch_targets.shape,
+        )
 
     end_token_id = char_to_id[end_token]
 

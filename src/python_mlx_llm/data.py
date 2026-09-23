@@ -1,4 +1,5 @@
 import mlx.core as mx
+from collections.abc import Iterator
 
 # To test independently:
 # uv run python -c 'from python_mlx_llm.tokenizer import CharacterTokenizer; from python_mlx_llm.data import create_training_windows; t = CharacterTokenizer("hello mlx"); ids = t.encode("hello mlx", add_end_token=True); x, y = create_training_windows(ids, 3); print(x.shape, y.shape); print(x[0].tolist(), y[0].tolist())'
@@ -38,3 +39,29 @@ def create_training_windows(
     targets = mx.stack(target_examples)
 
     return inputs, targets
+
+def iterator_batches(
+    inputs: mx.array,
+    targets: mx.array,
+    batch_size: int,
+) -> Iterator[tuple[mx.array, mx.array]]:
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+
+    if inputs.shape[0] != targets.shape[0]:
+        raise ValueError("inputs and targets must contain the same number of examples")
+
+
+    example_count = inputs.shape[0]
+    shuffled_indices = mx.random.permutation(example_count)
+
+    for start in range(0, example_count, batch_size):
+        batch_indices = shuffled_indices[
+            start : start + batch_size
+        ]
+
+        batch_inputs = inputs[batch_indices]
+        batch_targets = targets[batch_indices]
+
+        yield batch_inputs, batch_targets
