@@ -2,12 +2,9 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 from python_mlx_llm.tokenizer import CharacterTokenizer
-from python_mlx_llm.data import (
-    create_training_windows,
-    iterator_batches,
-)
+from python_mlx_llm.data import sample_batch, split_token_sequence
 from python_mlx_llm.model import ContextLanguageModel
-from path import Path
+from pathlib import Path
 
 
 def loss_fn(
@@ -25,9 +22,36 @@ def loss_fn(
         reduction="mean",
     )
 
+def estimate_loss(
+    model: ContextLanguageModel,
+    token_ids: list[int],
+    context_size: int,
+    batch_size: int,
+    evaluation_batches: int,
+) -> float:
+
+    total_loss = 0.0
+
+    for _ in range(evaluation_batches):
+        inputs, targets = sample_batch(
+            token_ids=token_ids,
+            context_size=context_size,
+            batch_size=batch_size,
+        )
+
+        loss = loss_fn(
+            model,
+            inputs,
+            targets,
+        )
+
+        mx.eval(loss)
+        total_loss += loss.item()
+
+    return total_loss / evaluation_batches
 def main() -> None:
     # The toy corpus includes a special token meaning "stop generating."
-    training_path = Path("data/input.txt")
+    training_path = Path("data/raw/tiny_shakespeare.txt")
     training_text = training_path.read_text(
         encoding="utf-8"
     )
@@ -49,47 +73,37 @@ def main() -> None:
 
     tokenized_text = tokenizer.encode(
         training_text,
-        add_end_token=True,
+        add_end_token=False,
     )
 
-    tokens = mx.array(tokenized_text)
+    training_tokens, validation_tokens = (
+        split_token_sequence(
+            token_ids=tokenized_text,
+            training_fraction=0.9,
+        )
+    )
+
+    print(
+        "Vocabulary size:",
+        tokenizer.vocabulary_size,
+    )
+
+    print(
+        "Training tokens:",
+        len(training_tokens),
+    )
+
+    print(
+        "Validation tokens:",
+        len(validation_tokens),
+    )
 
     char_to_id = tokenizer.token_to_id
     id_to_char = tokenizer.id_to_token
 
-    inputs, targets = create_training_windows(
-        token_ids=tokenized_text,
-        context_size=context_size,
-    )
-
     mx.random.seed(42)
 
-    for batch_inputs, batch_targets in iterator_batches(
-        inputs,
-        targets,
-        batch_size=4,
-    ):
-        print(
-            "Mini-batch shapes:",
-            batch_inputs.shape,
-            batch_targets.shape,
-        )
-
     end_token_id = char_to_id[end_token]
-
-    for example_index in range(inputs.shape[0]):
-        context_ids = inputs[example_index].tolist()
-        target_ids = targets[example_index].tolist()
-
-        context_text = tokenizer.decode(context_ids)
-        target_text = tokenizer.decode(target_ids)
-
-        print(
-            "Context:",
-            repr(context_text),
-            "Target:",
-            repr(target_text),
-        )
 
     # Build a small model with eight learned features per token/position.
     model = ContextLanguageModel(
@@ -98,63 +112,70 @@ def main() -> None:
         embedding_size=8,
     )
 
-    logits = model(inputs)
-    mx.eval(logits)
+    mx.eval(model.parameters())
 
     # Automatic differentiation computes how each weight affects the loss.
     # SGD uses those gradients to adjust weights after every step.
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     optimizer = optim.SGD(learning_rate=0.5)
 
+    training_steps = 1001
+    batch_size = 4
 
-    epoch_count = 501
-    update_step = 0
+    for step in range(training_steps):
+        batch_inputs, batch_targets = sample_batch(
+            token_ids=training_tokens,
+            context_size=context_size,
+            batch_size=batch_size,
+        )
 
-    for epoch in range(epoch_count):
-        epoch_loss_total = 0.0
-        epoch_example_count = 0
+        loss, gradients = loss_and_grad_fn(
+            model,
+            batch_inputs,
+            batch_targets,
+        )
 
-        for batch_inputs, batch_targets in iterator_batches(
-            inputs,
-            targets,
-            batch_size=4,
-        ):
-            loss, gradients = loss_and_grad_fn(
-                model,
-                batch_inputs,
-                batch_targets,
-            )
+        optimizer.update(model, gradients)
 
-            optimizer.update(model, gradients)
+        mx.eval(
+            model.parameters(),
+            optimizer.state,
+            loss,
+        )
 
-            mx.eval(
-                model.parameters(),
-                optimizer.state,
-                loss,
-            )
-
-            current_batch_size = batch_inputs.shape[0]
-
-            epoch_loss_total += (
-                loss.item() * current_batch_size
-            )
-            epoch_example_count += current_batch_size
-            update_step += 1
-
-        if epoch % 20 == 0:
-            average_epoch_loss = (
-                epoch_loss_total / epoch_example_count
-            )
-
-
+        if step % 50 == 0:
             print(
-                "Epoch:",
-                epoch,
-                "Update:",
-                update_step,
-                "loss:",
-                average_epoch_loss,
+                "Step:",
+                step,
+                "Batch loss:",
+                loss.item(),
             )
+
+    estimated_training_loss = estimate_loss(
+        model=model,
+        token_ids=training_tokens,
+        context_size=context_size,
+        batch_size=64,
+        evaluation_batches=20,
+    )
+
+    estimated_validation_loss = estimate_loss(
+        model=model,
+        token_ids=validation_tokens,
+        context_size=context_size,
+        batch_size=64,
+        evaluation_batches=20,
+    )
+
+    print(
+        "Estimated training loss:",
+        estimated_training_loss,
+    )
+
+    print(
+        "Estimated validation loss:",
+        estimated_validation_loss,
+    )
     # Probe the first position. The causal mask lets it see only "l", not the
     # later tokens, so both observed first-position continuations remain valid.
     letter_l_id = char_to_id["l"]
@@ -258,17 +279,6 @@ def main() -> None:
     generated_text = "".join(generated_characters)
 
     print("Context model generated:", repr(generated_text))
-
-    print("Model input shape:", inputs.shape)
-    print("Model output shape:", logits.shape)
-
-    print("Input batch:")
-    print(inputs)
-    print("Input shape:", inputs.shape)
-
-    print("Target batch:")
-    print(targets)
-    print("Target shape:", targets.shape)
 
 if __name__ == "__main__":
     main()
