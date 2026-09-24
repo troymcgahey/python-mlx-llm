@@ -1,6 +1,7 @@
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+import json
 from python_mlx_llm.tokenizer import CharacterTokenizer
 from python_mlx_llm.data import sample_batch, split_token_sequence
 from python_mlx_llm.model import ContextLanguageModel
@@ -233,23 +234,72 @@ def main() -> None:
             row,
         )
 
+    checkpoint_directory = Path("checkpoints")
+    checkpoint_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    checkpoint_path = (
+        checkpoint_directory / "single_head_baseline.safetensors"
+    )
+
+    model.save_weights(
+        str(checkpoint_path)
+    )
+
+    print(
+        "Saved model weights to",
+        checkpoint_path,
+    )
+
+    checkpoint_metadata = {
+        "context_size": context_size,
+        "embedding_size": embedding_size,
+        "vocabulary_size": tokenizer.tokens,
+        "end_token": tokenizer.end_token,
+    }
+
+    metadata_path = (
+        checkpoint_directory / "single_head_baseline.json"
+    )
+
+    metadata_path.write_text(
+        json.dumps(
+            checkpoint_metadata,
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    print(
+        "Saved model metadata to",
+        metadata_path,
+    )
 
     # Generate autoregressively: predict, append, then slide to the newest
     # three token IDs. Stop when the model predicts <EOS>.
-    prompt = "h"
+    prompt = "ROMEO:"
+
+    generation_steps = 300
+    temperature = 0.8
 
     generated_ids = []
 
     for character in prompt:
         generated_ids.append(char_to_id[character])
 
-    for step in range(12):
+    for step in range(generation_steps):
         context_ids = generated_ids[-context_size:]
         context_input = mx.array([context_ids])
 
         # [0, -1] selects the final position of the only batch example.
         next_logits = model(context_input)[0, -1]
-        next_id = mx.argmax(next_logits).item()
+
+        scaled_logits = next_logits / temperature
+
+        next_id = mx.random.categorical(scaled_logits).item()
 
         context_characters = []
 
@@ -259,14 +309,14 @@ def main() -> None:
         context_text = "".join(context_characters)
         next_character = id_to_char[next_id]
 
-        print(
-            "Generation step:",
-            step,
-            "Context",
-            repr(context_text),
-            "Prediction",
-            repr(next_character),
-        )
+        #print(
+        #    "Generation step:",
+        #    step,
+        #    "Context",
+        #    repr(context_text),
+        #    "Prediction",
+        #    repr(next_character),
+        #)
 
         if next_id == end_token_id:
             print("Reached the end-of-sequence token.")
