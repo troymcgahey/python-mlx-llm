@@ -79,12 +79,18 @@ class ContextLanguageModel(nn.Module):
                  return_attention: 
                  bool = False
     ) -> mx.array:
+
+        sequence_length = inputs.shape[1]
+
+        if sequence_length > self.context_size:
+            raise valueError("Input sequence is longer than the model context size")
+
         # inputs has shape (batch, context_size). Looking up token and position
         # vectors gives compatible arrays of shape (batch, context_size, width)
         # and (context_size, width); MLX broadcasts positions across the batch.
         token_embeddings = self.token_embedding(inputs)
 
-        positions = mx.arange(self.context_size)
+        positions = mx.arange(sequence_length)
         position_embeddings = self.position_embedding(positions)
 
         embeddings = token_embeddings + position_embeddings
@@ -107,7 +113,7 @@ class ContextLanguageModel(nn.Module):
         # Put -infinity above the diagonal: a position cannot see future tokens.
         causal_mask = mx.triu(
             mx.full(
-                shape=(self.context_size, self.context_size),
+                shape=(sequence_length, sequence_length),
                 vals=float("-inf"),
             ),
             k=1,

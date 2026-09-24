@@ -49,7 +49,14 @@ def estimate_loss(
         total_loss += loss.item()
 
     return total_loss / evaluation_batches
+
 def main() -> None:
+
+    context_size = 32
+    embedding_size = 64
+    batch_size = 32
+    training_steps = 3001
+
     # The toy corpus includes a special token meaning "stop generating."
     training_path = Path("data/raw/tiny_shakespeare.txt")
     training_text = training_path.read_text(
@@ -64,7 +71,6 @@ def main() -> None:
     )
 
     end_token = "<EOS>"
-    context_size = 3
 
     tokenizer = CharacterTokenizer(
         training_text=training_text,
@@ -109,18 +115,16 @@ def main() -> None:
     model = ContextLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=context_size,
-        embedding_size=8,
+        embedding_size=embedding_size,
     )
 
     mx.eval(model.parameters())
 
-    # Automatic differentiation computes how each weight affects the loss.
-    # SGD uses those gradients to adjust weights after every step.
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
-    optimizer = optim.SGD(learning_rate=0.5)
-
-    training_steps = 1001
-    batch_size = 4
+    optimizer = optim.AdamW(
+        learning_rate=1e-3,
+        weight_decay=0.01,
+    )
 
     for step in range(training_steps):
         batch_inputs, batch_targets = sample_batch(
@@ -143,7 +147,7 @@ def main() -> None:
             loss,
         )
 
-        if step % 50 == 0:
+        if step % 100 == 0:
             print(
                 "Step:",
                 step,
@@ -232,7 +236,7 @@ def main() -> None:
 
     # Generate autoregressively: predict, append, then slide to the newest
     # three token IDs. Stop when the model predicts <EOS>.
-    prompt = "hel"
+    prompt = "h"
 
     generated_ids = []
 
