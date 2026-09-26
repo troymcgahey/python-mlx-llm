@@ -256,7 +256,7 @@ def main() -> None:
     checkpoint_metadata = {
         "context_size": context_size,
         "embedding_size": embedding_size,
-        "vocabulary_size": tokenizer.tokens,
+        "vocabulary": tokenizer.tokens,
         "end_token": tokenizer.end_token,
     }
 

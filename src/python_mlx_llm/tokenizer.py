@@ -8,13 +8,26 @@
 class CharacterTokenizer:
     def __init__(
         self,
-        training_text: str,
+        training_text: str | None = None,
         end_token: str = "<EOS>",
+        vocabulary: list[str] | None = None,
     ) -> None:
-        self.end_token = end_token
 
-        self.tokens = sorted(set(training_text))
-        self.tokens.append(end_token)
+        if (
+            training_text is not None
+            and vocabulary is not None
+        ):
+            raise ValueError("Provide training_text or vocabulary, not both")
+
+        if vocabulary is not None:
+            self.tokens = list(vocabulary)
+        elif training_text is not None:
+            self.tokens = sorted(set(training_text))
+            self.tokens.append(end_token)
+        else:
+            raise ValueError("training_text or vocabulary is required")
+
+        self.end_token = end_token
 
         self.token_to_id = {}
 
