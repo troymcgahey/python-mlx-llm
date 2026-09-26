@@ -9,8 +9,15 @@ class ContextLanguageModel(nn.Module):
         vocabulary_size: int,
         context_size: int,
         embedding_size: int,
+        num_heads: int = 1,
     ) -> None:
         super().__init__()
+
+        if embedding_size % num_heads != 0:
+            raise valueError("embedding size must be a multiple of num_heads")
+
+        self.num_heads = num_heads
+        self.head_size = embedding_size // num_heads
 
         # Keep the sequence length and feature width available during forward passes.
         self.context_size = context_size
@@ -99,18 +106,47 @@ class ContextLanguageModel(nn.Module):
         # reads a normalized version of them.
         normalized_embeddings = self.attention_norm(embeddings)
 
-        # Each position produces a query, key, and value vector.
-        queries = self.query_projection(normalized_embeddings)
-        keys = self.key_projection(normalized_embeddings)
-        values = self.value_projection(normalized_embeddings)
+        queries = self.query_projection(
+            normalized_embeddings
+        )
+        keys = self.key_projection(
+            normalized_embeddings
+        )
+        values = self.value_projection(
+            normalized_embeddings
+        )
 
-        # Dot products score every query position against every key position.
-        # The result has shape (batch, context_size, context_size).
-        attention_scores = queries @ keys.transpose(0, 2, 1)
-        # Scaling keeps large dot products from making softmax too extreme.
-        attention_scores = attention_scores / (self.embedding_size ** 0.5)
+        batch_size = inputs.shape[0]
 
-        # Put -infinity above the diagonal: a position cannot see future tokens.
+        queries = queries.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_size,
+        ).transpose(0, 2, 1, 3)
+
+        keys = keys.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_size,
+        ).transpose(0, 2, 1, 3)
+
+        values = values.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_size,
+        ).transpose(0, 2, 1, 3)
+
+        attention_scores = (
+            queries @ keys.transpose(0, 1, 3, 2)
+        )
+
+        attention_scores = (
+            attention_scores / (self.head_size ** 0.5)
+        )
+
         causal_mask = mx.triu(
             mx.full(
                 shape=(sequence_length, sequence_length),
@@ -121,15 +157,24 @@ class ContextLanguageModel(nn.Module):
 
         attention_scores = attention_scores + causal_mask
 
-        # Convert scores to per-row probabilities; masked entries become zero.
         attention_weights = mx.softmax(
             attention_scores,
             axis=-1,
         )
 
-        # Mix value vectors according to attention, then preserve the original
-        # embeddings through a residual addition.
         attention_output = attention_weights @ values
+
+        attention_output = attention_output.transpose(
+            0,
+            2,
+            1,
+            3,
+        ).reshape(
+            batch_size,
+            sequence_length,
+            self.embedding_size,
+        )
+
         attended_embeddings = embeddings + attention_output
 
         # Transform each position's features independently, then add another
