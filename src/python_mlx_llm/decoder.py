@@ -229,7 +229,7 @@ def main() -> None:
     print("Attention columns:", list(inspection_text))
 
     for head_index, attention_matrix in enumerate(
-        attnetion_heads)
+        attention_heads
     ):
         print("Attention head:", head_index)
 
