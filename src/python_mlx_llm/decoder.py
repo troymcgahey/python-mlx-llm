@@ -55,6 +55,7 @@ def main() -> None:
 
     context_size = 32
     embedding_size = 64
+    num_heads = 4
     batch_size = 32
     training_steps = 3001
 
@@ -117,6 +118,7 @@ def main() -> None:
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=context_size,
         embedding_size=embedding_size,
+        num_heads=num_heads,
     )
 
     mx.eval(model.parameters())
@@ -222,17 +224,24 @@ def main() -> None:
 
     attention_matrix = inspection_attention[0].tolist()
 
+    attention_heads = inspection_attention[0].tolist()
+
     print("Attention columns:", list(inspection_text))
 
-    for position, row in enumerate(attention_matrix):
-        query_character = inspection_text[position]
+    for head_index, attention_matrix in enumerate(
+        attnetion_heads)
+    ):
+        print("Attention head:", head_index)
 
-        print(
-            "Attention from",
-            repr(query_character),
-            ":",
-            row,
-        )
+        for position, row in enumerate(attention_matrix):
+            query_character = inspection_text[position]
+
+            print(
+                "Attention from",
+                repr(query_character),
+                ":",
+                row,
+            )
 
     checkpoint_directory = Path("checkpoints")
     checkpoint_directory.mkdir(
@@ -241,7 +250,7 @@ def main() -> None:
     )
 
     checkpoint_path = (
-        checkpoint_directory / "single_head_baseline.safetensors"
+        checkpoint_directory / "four_head_baseline.safetensors"
     )
 
     model.save_weights(
@@ -256,12 +265,13 @@ def main() -> None:
     checkpoint_metadata = {
         "context_size": context_size,
         "embedding_size": embedding_size,
+        "num_heads": num_heads,
         "vocabulary": tokenizer.tokens,
         "end_token": tokenizer.end_token,
     }
 
     metadata_path = (
-        checkpoint_directory / "single_head_baseline.json"
+        checkpoint_directory / "four_head_baseline.json"
     )
 
     metadata_path.write_text(

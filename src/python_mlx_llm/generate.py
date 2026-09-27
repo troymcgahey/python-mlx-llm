@@ -31,6 +31,7 @@ def main() -> None:
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=metadata["context_size"],
         embedding_size=metadata["embedding_size"],
+        num_heads=metadata.get("num_heads", 1),
     )
 
     model.load_weights(str(weights_path))
