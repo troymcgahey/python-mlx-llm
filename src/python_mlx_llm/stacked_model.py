@@ -171,3 +171,99 @@ class TransformerBlock(nn.Module):
 
         return block_output
 
+class TransformerLanguageModel(nn.Module):
+    def __init__(
+        self,
+        vocabulary_size: int,
+        context_size: int,
+        embedding_size: int,
+        num_heads: int,
+        num_layers: int,
+    ) -> None:
+        super().__init__()
+
+        if num_layers <= 0:
+            raise ValueError("num_layers must be positive")
+
+        self.context_size = context_size
+
+        self.token_embedding = nn.Embedding(
+            num_embeddings=vocabulary_size,
+            dims=embedding_size,
+        )
+
+        self.position_embedding = nn.Embedding(
+            num_embeddings=context_size,
+            dims=embedding_size,
+        )
+
+        self.blocks = []
+
+        for _ in range(num_layers):
+            block = TransformerBlock(
+                embedding_size=embedding_size,
+                num_heads=num_heads,
+            )
+
+            self.blocks.append(block)
+
+        self.output_norm = nn.LayerNorm(
+            dims=embedding_size
+        )
+
+        self.output = nn.Linear(
+            input_dims=embedding_size,
+            output_dims=vocabulary_size,
+        )
+
+    def __call__(
+        self,
+        inputs: mx.array,
+        return_attention: bool=False,
+    ):
+
+        sequence_length = inputs.shape[1]
+
+        if sequence_length > self.context_size:
+            raise ValueError("Input sequence is longer than context_size")
+
+        token_embeddings = self.token_embedding(
+            inputs
+        )
+
+        positions = mx.arange(sequence_length)
+
+        position_embeddings = (
+            self.position_embedding(positions)
+        )
+
+        hidden_states = (
+            token_embeddings + position_embeddings
+        )
+
+        all_attention_weights = []
+
+        for block in self.blocks:
+            if return_attention:
+                hidden_states, attention_weights = block(
+                    hidden_states,
+                    return_attention=True,
+                )
+
+                all_attention_weights.append(
+                    attention_weights
+                )
+            else:
+                hidden_states = block(hidden_states)
+
+        hidden_states = self.output_norm(
+            hidden_states
+        )
+
+        logits = self.output(hidden_states)
+
+        if return_attention:
+            return logits, all_attention_weights
+
+        return logits
+
