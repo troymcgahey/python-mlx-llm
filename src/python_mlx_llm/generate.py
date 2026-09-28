@@ -8,7 +8,7 @@ from python_mlx_llm.tokenizer import CharacterTokenizer
 
 def main() -> None:
     checkpoint_directory = Path("checkpoints")
-    checkpoint_name = "single_head_baseline"
+    checkpoint_name = "four_head_baseline"
 
     metadata_path = (
         checkpoint_directory / f"{checkpoint_name}.json"
