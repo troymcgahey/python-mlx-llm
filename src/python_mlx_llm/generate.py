@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from python_mlx_llm.stacked_model import TransformerLanguageModel
 
 import mlx.core as mx
 
@@ -8,7 +9,7 @@ from python_mlx_llm.tokenizer import CharacterTokenizer
 
 def main() -> None:
     checkpoint_directory = Path("checkpoints")
-    checkpoint_name = "four_head_baseline"
+    checkpoint_name = "three_layer_transformer"
 
     metadata_path = (
         checkpoint_directory / f"{checkpoint_name}.json"
@@ -27,15 +28,15 @@ def main() -> None:
         end_token=metadata["end_token"],
     )
 
-    model = ContextLanguageModel(
+    model = TransformerLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=metadata["context_size"],
         embedding_size=metadata["embedding_size"],
-        num_heads=metadata.get("num_heads", 1),
+        num_heads=metadata["num_heads"],
+        num_layers=metadata["num_layers"],
     )
 
     model.load_weights(str(weights_path))
-    model.eval()
     mx.eval(model.parameters())
 
     prompt = "ROMEO:"
