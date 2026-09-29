@@ -4,12 +4,12 @@ import mlx.optimizers as optim
 import json
 from python_mlx_llm.tokenizer import CharacterTokenizer
 from python_mlx_llm.data import sample_batch, split_token_sequence
-from python_mlx_llm.model import ContextLanguageModel
+from python_mlx_llm.stacked_model import TransformerLanguageModel
 from pathlib import Path
 
 
 def loss_fn(
-    model: ContextLanguageModel,
+    model: TransformerLanguageModel,
     inputs: mx.array,
     targets: mx.array,
 ) -> mx.array:
@@ -24,7 +24,7 @@ def loss_fn(
     )
 
 def estimate_loss(
-    model: ContextLanguageModel,
+    model: TransformerLanguageModel,
     token_ids: list[int],
     context_size: int,
     batch_size: int,
@@ -56,6 +56,7 @@ def main() -> None:
     context_size = 32
     embedding_size = 64
     num_heads = 4
+    num_layers = 3
     batch_size = 32
     training_steps = 3001
 
@@ -114,11 +115,12 @@ def main() -> None:
     end_token_id = char_to_id[end_token]
 
     # Build a small model with eight learned features per token/position.
-    model = ContextLanguageModel(
+    model = TransformerLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=context_size,
         embedding_size=embedding_size,
         num_heads=num_heads,
+        num_layers=num_layers,
     )
 
     mx.eval(model.parameters())
@@ -217,15 +219,15 @@ def main() -> None:
 
     inspection_input = mx.array([inspection_ids])
 
-    inspection_logits, inspection_attention = model(
+    inspection_logits, all_attention = model(
         inspection_input,
         return_attention=True,
     )
 
-    attention_matrix = inspection_attention[0].tolist()
+    final_layer_attention = all_attention[-1]
+    attention_heads = final_layer_attention[0].tolist()
 
-    attention_heads = inspection_attention[0].tolist()
-
+    print("Final-layer attention")
     print("Attention columns:", list(inspection_text))
 
     for head_index, attention_matrix in enumerate(
@@ -250,7 +252,7 @@ def main() -> None:
     )
 
     checkpoint_path = (
-        checkpoint_directory / "four_head_baseline.safetensors"
+        checkpoint_directory / "three_layer_transformer.safetensors"
     )
 
     model.save_weights(
@@ -266,12 +268,13 @@ def main() -> None:
         "context_size": context_size,
         "embedding_size": embedding_size,
         "num_heads": num_heads,
+        "num_layers": num_layers,
         "vocabulary": tokenizer.tokens,
         "end_token": tokenizer.end_token,
     }
 
     metadata_path = (
-        checkpoint_directory / "four_head_baseline.json"
+        checkpoint_directory / "three_layer_transformer.json"
     )
 
     metadata_path.write_text(

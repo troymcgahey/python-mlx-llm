@@ -121,9 +121,11 @@ class TransformerBlock(nn.Module):
             k=1,
         )
 
+        attention_scores = attention_scores + causal_mask
+
         attention_weights = mx.softmax(
             attention_scores,
-            axis=1,
+            axis=-1,
         )
 
         attention_output = (
