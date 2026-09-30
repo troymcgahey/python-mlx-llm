@@ -5,7 +5,7 @@ import json
 from python_mlx_llm.tokenizer import CharacterTokenizer
 from python_mlx_llm.data import sample_batch, split_token_sequence
 from python_mlx_llm.stacked_model import TransformerLanguageModel
-from python_mlx_llm.config import ModelConfig
+from python_mlx_llm.config import ModelConfig, TrainingConfig, TrainingConfig
 from pathlib import Path
 
 
@@ -61,8 +61,15 @@ def main() -> None:
         num_layers=3,
     )
 
-    batch_size = 32
-    training_steps = 3001
+    training_config = TrainingConfig(
+        batch_size=32,
+        learning_rate=3e-4,
+        max_steps=3000,
+        log_interval=100,
+        evaluation_batches=20,
+        training_fraction=0.9,
+        random_seed=42,
+    )
 
     # The toy corpus includes a special token meaning "stop generating."
     training_path = Path("data/raw/tiny_shakespeare.txt")
@@ -92,7 +99,7 @@ def main() -> None:
     training_tokens, validation_tokens = (
         split_token_sequence(
             token_ids=tokenized_text,
-            training_fraction=0.9,
+            training_fraction=training_config.training_fraction,
         )
     )
 
@@ -114,7 +121,7 @@ def main() -> None:
     char_to_id = tokenizer.token_to_id
     id_to_char = tokenizer.id_to_token
 
-    mx.random.seed(42)
+    mx.random.seed(training_config.random_seed)
 
     end_token_id = char_to_id[end_token]
 
@@ -131,15 +138,15 @@ def main() -> None:
 
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     optimizer = optim.AdamW(
-        learning_rate=1e-3,
+        learning_rate=training_config.learning_rate,
         weight_decay=0.01,
     )
 
-    for step in range(training_steps):
+    for step in range(training_config.max_steps):
         batch_inputs, batch_targets = sample_batch(
             token_ids=training_tokens,
             context_size=model_config.context_size,
-            batch_size=batch_size,
+            batch_size=training_config.batch_size,
         )
 
         loss, gradients = loss_and_grad_fn(
@@ -156,7 +163,7 @@ def main() -> None:
             loss,
         )
 
-        if step % 100 == 0:
+        if step % training_config.log_interval == 0:
             print(
                 "Step:",
                 step,
@@ -168,16 +175,16 @@ def main() -> None:
         model=model,
         token_ids=training_tokens,
         context_size=model_config.context_size,
-        batch_size=64,
-        evaluation_batches=20,
+        batch_size=training_config.batch_size,
+        evaluation_batches=training_config.evaluation_batches,
     )
 
     estimated_validation_loss = estimate_loss(
         model=model,
         token_ids=validation_tokens,
         context_size=model_config.context_size,
-        batch_size=64,
-        evaluation_batches=20,
+        batch_size=training_config.batch_size,
+        evaluation_batches=training_config.evaluation_batches,
     )
 
     print(
