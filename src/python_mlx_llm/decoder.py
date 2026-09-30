@@ -5,6 +5,7 @@ import json
 from python_mlx_llm.tokenizer import CharacterTokenizer
 from python_mlx_llm.data import sample_batch, split_token_sequence
 from python_mlx_llm.stacked_model import TransformerLanguageModel
+from python_mlx_llm.config import ModelConfig
 from pathlib import Path
 
 
@@ -53,10 +54,13 @@ def estimate_loss(
 
 def main() -> None:
 
-    context_size = 32
-    embedding_size = 64
-    num_heads = 4
-    num_layers = 3
+    model_config = ModelConfig(
+        context_size=62,
+        embedding_size=32,
+        num_heads=4,
+        num_layers=3,
+    )
+
     batch_size = 32
     training_steps = 3001
 
@@ -117,10 +121,10 @@ def main() -> None:
     # Build a small model with eight learned features per token/position.
     model = TransformerLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
-        context_size=context_size,
-        embedding_size=embedding_size,
-        num_heads=num_heads,
-        num_layers=num_layers,
+        context_size=model_config.context_size,
+        embedding_size=model_config.embedding_size,
+        num_heads=model_config.num_heads,
+        num_layers=model_config.num_layers,
     )
 
     mx.eval(model.parameters())
@@ -134,7 +138,7 @@ def main() -> None:
     for step in range(training_steps):
         batch_inputs, batch_targets = sample_batch(
             token_ids=training_tokens,
-            context_size=context_size,
+            context_size=model_config.context_size,
             batch_size=batch_size,
         )
 
@@ -163,7 +167,7 @@ def main() -> None:
     estimated_training_loss = estimate_loss(
         model=model,
         token_ids=training_tokens,
-        context_size=context_size,
+        context_size=model_config.context_size,
         batch_size=64,
         evaluation_batches=20,
     )
@@ -171,7 +175,7 @@ def main() -> None:
     estimated_validation_loss = estimate_loss(
         model=model,
         token_ids=validation_tokens,
-        context_size=context_size,
+        context_size=model_config.context_size,
         batch_size=64,
         evaluation_batches=20,
     )
@@ -265,10 +269,10 @@ def main() -> None:
     )
 
     checkpoint_metadata = {
-        "context_size": context_size,
-        "embedding_size": embedding_size,
-        "num_heads": num_heads,
-        "num_layers": num_layers,
+        "context_size": model_config.context_size,
+        "embedding_size": model_config.embedding_size,
+        "num_heads": model_config.num_heads,
+        "num_layers": model_config.num_layers,
         "vocabulary": tokenizer.tokens,
         "end_token": tokenizer.end_token,
     }
@@ -304,7 +308,7 @@ def main() -> None:
         generated_ids.append(char_to_id[character])
 
     for step in range(generation_steps):
-        context_ids = generated_ids[-context_size:]
+        context_ids = generated_ids[-model_config.context_size:]
         context_input = mx.array([context_ids])
 
         # [0, -1] selects the final position of the only batch example.
@@ -322,14 +326,6 @@ def main() -> None:
         context_text = "".join(context_characters)
         next_character = id_to_char[next_id]
 
-        #print(
-        #    "Generation step:",
-        #    step,
-        #    "Context",
-        #    repr(context_text),
-        #    "Prediction",
-        #    repr(next_character),
-        #)
 
         if next_id == end_token_id:
             print("Reached the end-of-sequence token.")
