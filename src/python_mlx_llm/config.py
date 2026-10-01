@@ -79,5 +79,25 @@ class TrainingConfig:
         if not 0.0 < self.training_fraction < 1.0:
             raise ValueError("training_fraction must be between 0 and 1")
 
+@dataclass(frozen=True)
+class GenerationConfig:
+    """Settings that control text generation."""
+
+    prompt: str = "ROMEO."
+    max_new_tokens: int = 300
+    temperature: float = 0.8
+    random_seed: int = 42
+
+    def __post_init_(self) -> None:
+        
+        if not self.prompt:
+            raise ValueError("prompt cannont be empty")
+
+        if self.max_new_tokens <= 0:
+            raise ValueError("max_new_tokens must be positive")
+
+        if self.temperature <= 0:
+            raise ValueError("temperature must be positive")
+
 
 
