@@ -25,6 +25,27 @@ class ModelConfig:
         if self.embedding_size % self.num_heads != 0:
             raise ValueError("embedding_size must be a multiple of num_heads")
 
+    def to_dict(self) -> dict[str, int]:
+        """Return a JSON-compatible representation of this configuration."""
+
+        return {
+                "context_size": self.context_size,
+                "embedding_size": self.embedding_size,
+                "num_heads": self.num_heads,
+                "num_layers": self.num_layers,
+        }
+
+    @classmethod
+    def from_dict(cls, values: dict) -> "ModelConfig":
+        """Create a configuration from checkpoint metadata."""
+
+        return cls(
+            context_size=values["context_size"],
+            embedding_size=values["embedding_size"],
+            num_heads=values["num_heads"],
+            num_layers=values["num_layers"],
+        )
+
 
 @dataclass(frozen=True)
 class TrainingConfig:

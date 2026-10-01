@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from python_mlx_llm.stacked_model import TransformerLanguageModel
+from python_mlx_llm.config import ModelConfig
 
 import mlx.core as mx
 
@@ -23,6 +24,8 @@ def main() -> None:
         metadata_path.read_text(encoding="utf-8")
     )
 
+    model_config = ModelConfig.from_dict(metadata)
+
     tokenizer = CharacterTokenizer(
         vocabulary=metadata["vocabulary"],
         end_token=metadata["end_token"],
@@ -31,9 +34,9 @@ def main() -> None:
     model = TransformerLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=metadata["context_size"],
-        embedding_size=metadata["embedding_size"],
-        num_heads=metadata["num_heads"],
-        num_layers=metadata["num_layers"],
+        embedding_size=model_config.embedding_size,
+        num_heads=model_config.num_heads,
+        num_layers=model_config.num_layers,
     )
 
     model.load_weights(str(weights_path))

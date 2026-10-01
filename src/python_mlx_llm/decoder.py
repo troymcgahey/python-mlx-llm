@@ -276,12 +276,9 @@ def main() -> None:
     )
 
     checkpoint_metadata = {
-        "context_size": model_config.context_size,
-        "embedding_size": model_config.embedding_size,
-        "num_heads": model_config.num_heads,
-        "num_layers": model_config.num_layers,
         "vocabulary": tokenizer.tokens,
         "end_token": tokenizer.end_token,
+        **model_config.to_dict(),
     }
 
     metadata_path = (
