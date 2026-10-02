@@ -9,6 +9,17 @@ import mlx.core as mx
 from python_mlx_llm.model import ContextLanguageModel
 from python_mlx_llm.tokenizer import CharacterTokenizer
 
+# uv run python -m python_mlx_llm.generate --help
+#
+#
+#
+# uv run python -m python_mlx_llm.generate \
+#  --prompt "JULIET:" \
+#  --max-new-tokens 150 \
+#  --temperature 0.7 \
+#  --seed 10
+#
+#
 def parse_arguments() -> argparse.Namespace:
     """Read generation options supplied on the command line."""
 
