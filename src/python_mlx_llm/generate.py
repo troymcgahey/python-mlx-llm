@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from python_mlx_llm.stacked_model import TransformerLanguageModel
-from python_mlx_llm.config import ModelConfig
+from python_mlx_llm.config import GenerationConfig, ModelConfig
 
 import mlx.core as mx
 
@@ -31,6 +31,13 @@ def main() -> None:
         end_token=metadata["end_token"],
     )
 
+    generation_config = GenerationConfig(
+        prompt="ROMEO:",
+        max_new_tokens=300,
+        temperature=0.8,
+        random_seed=42,
+    )
+
     model = TransformerLanguageModel(
         vocabulary_size=tokenizer.vocabulary_size,
         context_size=metadata["context_size"],
@@ -42,17 +49,13 @@ def main() -> None:
     model.load_weights(str(weights_path))
     mx.eval(model.parameters())
 
-    prompt = "ROMEO:"
-    generation_steps = 300
-    temperature = 0.8
+    mx.random.seed(generation_config.random_seed)
 
-    mx.random.seed(42)
-
-    generated_ids = tokenizer.encode(prompt)
+    generated_ids = tokenizer.encode(generation_config.prompt)
 
     end_token_id = tokenizer.token_to_id[tokenizer.end_token]
 
-    for _ in range(generation_steps):
+    for _ in range(generation_config.max_new_tokens):
         context_ids = generated_ids[
             -metadata["context_size"] :
         ]
@@ -60,7 +63,7 @@ def main() -> None:
         context_input = mx.array([context_ids])
 
         next_logits = model(context_input)[0, -1]
-        scaled_logits = next_logits / temperature
+        scaled_logits = next_logits / generation_config.temperature
 
         next_id = mx.random.categorical(
             scaled_logits
