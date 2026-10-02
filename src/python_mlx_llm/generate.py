@@ -1,4 +1,5 @@
 import json
+import argparse
 from pathlib import Path
 from python_mlx_llm.stacked_model import TransformerLanguageModel
 from python_mlx_llm.config import GenerationConfig, ModelConfig
@@ -8,7 +9,55 @@ import mlx.core as mx
 from python_mlx_llm.model import ContextLanguageModel
 from python_mlx_llm.tokenizer import CharacterTokenizer
 
+def parse_arguments() -> argparse.Namespace:
+    """Read generation options supplied on the command line."""
+
+    parser = argparse.ArgumentParser(
+        description="Generate text using a trained character language model."
+    )
+
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        default="ROMEO:",
+        help="Text the model continues from.",
+    )
+
+    parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=300,
+        help="Maximum number of tokens to generate.",
+    )
+
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.8,
+        help="Sampling randomness: higher values produce more variation.",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed used for reproducible sampling.",
+    )
+
+    return parser.parse_args()
+
+
 def main() -> None:
+
+    arguments = parse_arguments()
+
+    generation_config = GenerationConfig(
+        prompt=arguments.prompt,
+        max_new_tokens=arguments.max_new_tokens,
+        temperature=arguments.temperature,
+        random_seed=arguments.seed,
+    )
+
     checkpoint_directory = Path("checkpoints")
     checkpoint_name = "three_layer_transformer"
 
@@ -29,13 +78,6 @@ def main() -> None:
     tokenizer = CharacterTokenizer(
         vocabulary=metadata["vocabulary"],
         end_token=metadata["end_token"],
-    )
-
-    generation_config = GenerationConfig(
-        prompt="ROMEO:",
-        max_new_tokens=300,
-        temperature=0.8,
-        random_seed=42,
     )
 
     model = TransformerLanguageModel(
